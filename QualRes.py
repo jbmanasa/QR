@@ -6,6 +6,7 @@ class STATE(Enum):
     INVALID = 'invalid'
 CHANGE = {'increase', 'decrease', 'steady'}
 UPDATE_COUNT = 1
+
 class QuantityVolAndOut:
     current_state = STATE.ZERO
     def set_state(self, state):
