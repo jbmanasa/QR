@@ -1,5 +1,6 @@
 from enum import Enum
 from itertools import  product
+from graphviz import Digraph
 
 TAP = 0
 SINK = 1
@@ -82,12 +83,18 @@ def is_valid_zero_volume_state(sink, drain):
         return False
     return True
 
+def is_valid_no_magnitude_but_decresing(tap, sink, drain):
+    if sink[MAGNITUDE] is '0' and sink[DERIVATIVE] is '-': return False
+    if tap[MAGNITUDE] is '0' and tap[DERIVATIVE] is  '-': return False
+    if drain[MAGNITUDE] is '0' and drain[DERIVATIVE] is '-': return False
+    return True
+
 def is_valid_state(state):
     #With this call we have only 12 valid states xd
     if not is_valid_influence(state[TAP], state[SINK], state[DRAIN]):
         # print(1)
         return False
-    #Havent written this yet . Returns true for now
+    # TODO Havent written this yet. Returns true for now
     if not is_valid_vol_outflow_proportional(state[SINK], state[DRAIN]):
         return False
     if not is_valid_max_volume_state(state[SINK], state[DRAIN]):
@@ -96,17 +103,53 @@ def is_valid_state(state):
     if not is_valid_zero_volume_state(state[SINK], state[DRAIN]):
         # print(3)
         return False
+    if not is_valid_no_magnitude_but_decresing(state[TAP], state[SINK], state[DRAIN]):
+        # print(4)
+        return False
     return True
 
 VALID_STATE_COUNT = 0
 INVALID_STATE_COUNT = 0
+
+valid_states = {}
 for sys_state in list(SYSTEM_STATES):
     if not is_valid_state(sys_state):
         INVALID_STATE_COUNT += 1
-        print("----X.X---- : ", "Tap :" ,sys_state[TAP], "SINK : ", sys_state[SINK], "Drain : ", sys_state[DRAIN])
+        # print("----------- : ", "Tap :" ,sys_state[TAP], "SINK : ", sys_state[SINK], "Drain : ", sys_state[DRAIN])
     else:
         VALID_STATE_COUNT += 1
+        valid_states[sys_state]=[]
         print("Valid State : ", "Tap :", sys_state[TAP], "SINK : ", sys_state[SINK], "Drain : ", sys_state[DRAIN])
 
 print("Number of Valid states = ", VALID_STATE_COUNT)
 print("Number of Invalid states = ", INVALID_STATE_COUNT)
+
+
+""" ----------------------------------------------------------
+    Generate Transitions -------------------------------------
+    ----------------------------------------------------------"""
+
+def generate_transitions(state, graph, all_states):
+    state1_name = str(state).replace('MAX', 'max')
+    graph.node(state1_name)
+    tap, sink, drain = state[0], state[1], state[2]
+    # print(tap, sink, drain)
+
+    state2 = None
+    if sink == ('MAX', '-'):
+        state2 = (tap, ('+', '-'), drain) # not max anymore, decreased
+    elif sink == ('0', '+'):
+        state2 = (tap, ('+', '+'), drain) # not 0 anymore, increased
+
+    if state2 and state2 in all_states:
+        state2_name = str(state2).replace('MAX', 'max')
+        graph.edge(state1_name, state2_name) # draw edge
+        all_states[state].append(state2)     # save edge
+
+g = Digraph('G', filename='behavior_graph.gv', engine='sfdp')
+
+for state in valid_states.keys():
+    generate_transitions(state, g, valid_states)
+
+print(valid_states) # keys: valid states, values: connected (&directed) states/edges
+g.view()
