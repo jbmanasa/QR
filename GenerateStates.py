@@ -130,21 +130,38 @@ print("Number of Invalid states = ", INVALID_STATE_COUNT)
     ----------------------------------------------------------"""
 
 def generate_transitions(state, graph, all_states):
-    state1_name = str(state).replace('MAX', 'max')
+    state1_name = str(state).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
     graph.node(state1_name)
     tap, sink, drain = state[0], state[1], state[2]
     # print(tap, sink, drain)
 
-    state2 = None
+    state2s = []
     if sink == ('MAX', '-'):
-        state2 = (tap, ('+', '-'), drain) # not max anymore, decreased
+        state2s.append((tap, ('+', '-'), drain)) # not max anymore, decreased
     elif sink == ('0', '+'):
-        state2 = (tap, ('+', '+'), drain) # not 0 anymore, increased
+        state2s.append((tap, ('+', '+'), drain)) # not 0 anymore, increased
+    elif sink == ('+', '-'):
+        state2s.append((tap, ('0', '0'), drain))
 
-    if state2 and state2 in all_states:
-        state2_name = str(state2).replace('MAX', 'max')
-        graph.edge(state1_name, state2_name) # draw edge
-        all_states[state].append(state2)     # save edge
+    if tap == ('+', '-'):
+        if drain == ('0', '0'):
+            state2s.append((('0', '0'), (sink[0], '0'), drain))  #TODO not sure correct approach
+        else:
+            state2s.append((('0', '0'), sink, drain))
+
+    elif drain == ('+', '-'):
+        if tap == ('0', '0'):
+            state2s.append((tap, (sink[0], '0'), ('0', '0')))
+        else:
+            state2s.append((tap, sink, ('0', '0')))
+
+    for state2 in state2s:
+        if state2 in all_states:
+            state2_name = str(state2).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+            graph.edge(state1_name, state2_name) # draw edge
+            all_states[state].append(state2)     # save edge
+        else:
+            print("couldnt find:", str(state2))
 
 g = Digraph('G', filename='behavior_graph.gv', engine='sfdp')
 
