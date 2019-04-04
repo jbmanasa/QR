@@ -46,18 +46,14 @@ def total_influence(i1, i2, isign1, isign2):
     if i1=='0': return i2
     if i2=='0': return i1
     if i1!=i2: # only possiblity is +,-
-        if isign1 == '+' and isign2 == 'MAX':
-            return i2
-        return 'ambigious' # alternatively can return 0 (assuming they work at the same rate)
+        return 'ambigious'
     return i1 # they're the same
 
 def is_valid_influence(tap, sink, drain):
     inflow_influence_on_volume = get_influence(tap[MAGNITUDE], '+')
     outflow_inlfuence_on_volume = get_influence(drain[MAGNITUDE],'-')
-
     final_inf = total_influence(inflow_influence_on_volume, outflow_inlfuence_on_volume,
                                 tap[MAGNITUDE], drain[MAGNITUDE])
-
     if final_inf != sink[DERIVATIVE] and final_inf != 'ambigious':
         return False
     return True
@@ -148,29 +144,35 @@ def generate_transitions(state, graph, all_states):
         state2s.append((tap, ('+', '+'), ('+', drain[1]))) # not 0 anymore, increased
     elif sink == ('+', '-'):
         state2s.append((tap, ('0', '0'), ('0', '0'))) # TODO don't feel comfortable hardcoding x(
+    elif sink == ('+', '+'):
+        state2s.append((tap, ('MAX', '0'), ('MAX', '0'))) #TODO hmm
 
     if tap == ('+', '-'): # goes to 0
         if drain == ('0', '0'):
             state2s.append((('0', '0'), (sink[0], '0'), drain))  #TODO not sure correct approach
         else:
             state2s.append((('0', '0'), sink, drain))
-
-    elif drain == ('+', '-'): # goes to zero
-            state2s.append((tap, ('0', '0'), ('0', '0')))
-
-    if tap == ('0', '+'):
-        graph.node(state1_name, color='blue')
+    elif tap == ('0', '+'):
         state2s.append((('+', '+'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
-        state2s.append((('+', '-'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
-        state2s.append((('+', '0'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
 
-    if drain == ('0', '+'):
-        graph.node(state1_name, color='blue')
+    if tap[0] == '+':
+        if drain != ('0', '0'):
+            state2s.append((tap, (sink[0], '0'), (drain[0], '0')))
+            state2s.append((tap, (sink[0], '-'), (drain[0], '-')))
+            state2s.append((tap, (sink[0], '+'), (drain[0], '+')))
+
+    if drain == ('+', '-'): # goes to zero
+        state2s.append((tap, ('0', '0'), ('0', '0')))
+    elif drain == ('0', '+'):
         state2s.append((tap, ('+', sink[1]), ('+', sink[1])))
 
     for state2 in state2s: # connect edges
         if state2 in all_states:
             state2_name = str(state2).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+
+            if tap[0] == '+':
+                if drain != ('0', '0'):
+                    graph.node(state1_name, color='red')
             if state2 not in all_states[state]:
                 graph.edge(state1_name, state2_name) # draw edge
                 all_states[state].append(state2)     # save edge
@@ -178,9 +180,8 @@ def generate_transitions(state, graph, all_states):
             print("couldnt find:", str(state2))
 
 
-g = Digraph('G', filename='behavior_graph.gv', engine='sfdp')
-
-print((('+', '+'), ('+', '-'), ('max', '-')) in valid_states)
+g = Digraph('G', filename='behavior_graph.gv')
+g.attr('edge',overlap='false')
 for state in valid_states.keys():
     generate_transitions(state, g, valid_states)
 
