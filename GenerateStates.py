@@ -23,7 +23,7 @@ SYSTEM_STATES = product(list(INFLOW_STATES), list(VOLUME_STATES), list(OUTFLOW_S
 
 # for idx, sys_state in enumerate(list(SYSTEM_STATES)):
 #     print(idx, "Tap :" ,sys_state[0], "SINK : ", sys_state[1], "Drain : ", sys_state[2])
-
+AMBIG_STATES = []
 def get_influence(mag, influence):
     result_change = ''
     if mag is '0' or influence is '0':
@@ -56,6 +56,8 @@ def is_valid_influence(tap, sink, drain):
                                 tap[MAGNITUDE], drain[MAGNITUDE])
     if final_inf != sink[DERIVATIVE] and final_inf != 'ambigious':
         return False
+    if final_inf == 'ambigious':
+        AMBIG_STATES.append((tap,sink,drain))
     return True
 
 def is_valid_vol_outflow_proportional(sink, drain):
@@ -72,8 +74,6 @@ def is_valid_max_volume_state(sink, drain):
         return False
     if drain[MAGNITUDE] is not 'MAX' and sink[MAGNITUDE] is 'MAX':
         return False
-    # if drain[MAGNITUDE] != sink[MAGNITUDE]:
-    #     return False
     return True
 
 def is_valid_zero_volume_state(sink, drain):
@@ -92,19 +92,15 @@ def is_valid_no_magnitude_but_decresing(tap, sink, drain):
 def is_valid_state(state):
     #With this call we have only 12 valid states xd
     if not is_valid_influence(state[TAP], state[SINK], state[DRAIN]):
-        # print(1)
         return False
     # TODO Havent written this yet. Returns true for now
     if not is_valid_vol_outflow_proportional(state[SINK], state[DRAIN]):
         return False
     if not is_valid_max_volume_state(state[SINK], state[DRAIN]):
-        # print(2)
         return False
     if not is_valid_zero_volume_state(state[SINK], state[DRAIN]):
-        # print(3)
         return False
     if not is_valid_no_magnitude_but_decresing(state[TAP], state[SINK], state[DRAIN]):
-        # print(4)
         return False
     return True
 
@@ -119,7 +115,7 @@ for sys_state in list(SYSTEM_STATES):
     else:
         VALID_STATE_COUNT += 1
         valid_states[sys_state]=[]
-        print("Valid State : ", "Tap :", sys_state[TAP], "SINK : ", sys_state[SINK], "Drain : ", sys_state[DRAIN])
+        # print("Valid State : ", "Tap :", sys_state[TAP], "SINK : ", sys_state[SINK], "Drain : ", sys_state[DRAIN])
 
 print("Number of Valid states = ", VALID_STATE_COUNT)
 print("Number of Invalid states = ", INVALID_STATE_COUNT)
@@ -131,6 +127,7 @@ print("Number of Invalid states = ", INVALID_STATE_COUNT)
 
 def generate_transitions(state, graph, all_states):
     state1_name = str(state).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+    # print(state1_name)
     graph.node(state1_name)
     if state1_name.count('0')==6:
         graph.node(state1_name, shape='doublecircle')
@@ -186,5 +183,6 @@ for state in valid_states.keys():
     generate_transitions(state, g, valid_states)
 
 
-print(valid_states) # keys: valid states, values: connected (&directed) states/edges
+# print(valid_states) # keys: valid states, values: connected (&directed) states/edges
+# print(AMBIG_STATES)
 g.view()
