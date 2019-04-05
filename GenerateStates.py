@@ -5,6 +5,8 @@ from graphviz import Digraph
 TAP = 0
 SINK = 1
 DRAIN = 2
+HEIGHT = 3
+PRESSURE = 4
 
 MAGNITUDE = 0
 DERIVATIVE = 1
@@ -12,14 +14,18 @@ DERIVATIVE = 1
 INFLOW_VALUES = {'0','+'}
 VOLUME_VALUES = {'0','+','MAX'}
 OUTFLOW_VALUES = {'0', '+', 'MAX'}
+PRESSURE_VALUES = {'0', '+', 'MAX'}
+HEIGHT_VALUES = {'0', '+', 'MAX'}
 
 CHANGE = {'0', '+', '-'}
 
 INFLOW_STATES = product(INFLOW_VALUES, CHANGE)
 VOLUME_STATES = product(VOLUME_VALUES, CHANGE)
 OUTFLOW_STATES = product(OUTFLOW_VALUES, CHANGE)
+PRESSURE_STATES = product(PRESSURE_VALUES, CHANGE)
+HEIGHT_STATES = product(HEIGHT_VALUES, CHANGE)
 
-SYSTEM_STATES = product(list(INFLOW_STATES), list(VOLUME_STATES), list(OUTFLOW_STATES))
+SYSTEM_STATES = product(list(INFLOW_STATES), list(VOLUME_STATES), list(OUTFLOW_STATES), list(HEIGHT_STATES), list(PRESSURE_STATES))
 
 # for idx, sys_state in enumerate(list(SYSTEM_STATES)):
 #     print(idx, "Tap :" ,sys_state[0], "SINK : ", sys_state[1], "Drain : ", sys_state[2])
@@ -64,11 +70,12 @@ def is_valid_influence(tap, sink, drain):
     return True
 
 def is_valid_vol_outflow_proportional(sink, drain):
-    if sink[DERIVATIVE] is '-' and drain[DERIVATIVE] is '-' :
+    if sink[DERIVATIVE] == drain[DERIVATIVE]:
         return True
-    elif sink[DERIVATIVE] is '+' and drain[DERIVATIVE] is '+' :
-        return True
-    elif sink[DERIVATIVE] is '0' and drain[DERIVATIVE] is '0' :
+    return False
+
+def is_valid__positive_proportional(quantity_1, quantity_2):
+    if quantity_1[DERIVATIVE] == quantity_2[DERIVATIVE]:
         return True
     return False
 
@@ -79,33 +86,67 @@ def is_valid_max_volume_state(sink, drain):
         return False
     return True
 
-def is_valid_zero_volume_state(sink, drain):
-    if drain[MAGNITUDE] is '0' and sink[MAGNITUDE] is not '0':
-        return False
-    if drain[MAGNITUDE] is not '0' and sink[MAGNITUDE] is '0':
+def is_valid_pressure_outflow_state(pressure, drain):
+    if pressure[MAGNITUDE] != drain[MAGNITUDE]:
         return False
     return True
 
-def is_valid_no_magnitude_but_decresing(tap, sink, drain):
-    if sink[MAGNITUDE] is '0' and sink[DERIVATIVE] is '-': return False
-    if tap[MAGNITUDE] is '0' and tap[DERIVATIVE] is  '-': return False
-    if drain[MAGNITUDE] is '0' and drain[DERIVATIVE] is '-': return False
+def is_valid_zero_volume_state(sink, drain, height, pressure):
+    # if drain[MAGNITUDE] is not '0' and sink[MAGNITUDE] is '0':
+    #     return False
+    if sink[MAGNITUDE] is '0' and (drain[MAGNITUDE] != '0' or height[MAGNITUDE] != '0' or pressure[MAGNITUDE] != '0'):
+        return False
+    if height[MAGNITUDE] is '0' and sink[MAGNITUDE] is not '0':
+        return False
+    if pressure[MAGNITUDE] is '0' and sink[MAGNITUDE] is not '0':
+        return False
+    if drain[MAGNITUDE] is '0' and sink[MAGNITUDE] is not '0':
+        return False
+    return True
+
+# def is_valid_no_magnitude_but_decresing(tap, sink, drain):
+#     if sink[MAGNITUDE] is '0' and sink[DERIVATIVE] is '-': return False
+#     if tap[MAGNITUDE] is '0' and tap[DERIVATIVE] is  '-': return False
+#     if drain[MAGNITUDE] is '0' and drain[DERIVATIVE] is '-': return False
+#     return True
+
+def is_valid_no_magnitude_but_decresing(quantity):
+    if quantity[MAGNITUDE] is '0' and quantity[DERIVATIVE] is '-': return False
+    return True
+
+def is_equal_magnitude_state(quantity_1, quantity_2):
+    if quantity_1[MAGNITUDE] != quantity_2[MAGNITUDE]:
+        return False
     return True
 
 def is_valid_state(state):
     #With this call we have only 12 valid states xd
-    if not is_valid_influence(state[TAP], state[SINK], state[DRAIN]):
+
+    if not is_valid_influence(state[TAP], state[SINK], state[DRAIN]): #Does the inputs to this still remain the same?
         return False
-    # TODO Havent written this yet. Returns true for now
-    if not is_valid_vol_outflow_proportional(state[SINK], state[DRAIN]):
+    # if not is_valid_max_volume_state(state[SINK], state[DRAIN]):
+    #     return False
+    if not is_valid_zero_volume_state(state[SINK], state[DRAIN], state[HEIGHT], state[PRESSURE]):
         return False
-    if not is_valid_max_volume_state(state[SINK], state[DRAIN]):
+    for quantity in state:
+        if not is_valid_no_magnitude_but_decresing(quantity):
+            return False
+    if not is_valid__positive_proportional(state[SINK], state[HEIGHT]):
         return False
-    if not is_valid_zero_volume_state(state[SINK], state[DRAIN]):
+    if not is_valid__positive_proportional(state[HEIGHT], state[PRESSURE]):
         return False
-    if not is_valid_no_magnitude_but_decresing(state[TAP], state[SINK], state[DRAIN]):
+    if not is_valid__positive_proportional(state[PRESSURE], state[DRAIN]):
         return False
+    if not is_valid_pressure_outflow_state(state[PRESSURE], state[DRAIN]):
+        return False
+    # if not is_equal_magnitude_state(state[SINK], state[HEIGHT]): #Not sure if this is correct
+    #     return False
+    # if not is_equal_magnitude_state(state[HEIGHT], state[PRESSURE]): #Not sure if this is correct
+    #     return False
+    # if not is_equal_magnitude_state(state[PRESSURE], state[DRAIN]): #Not sure if this is correct
+    #     return False
     return True
+
 
 VALID_STATE_COUNT = 0
 INVALID_STATE_COUNT = 0
@@ -178,10 +219,14 @@ def generate_transitions(state, graph, all_states):
 
 g = Digraph('G', filename='behavior_graph.gv', engine='sfdp')
 
-for state in valid_states.keys():
-    generate_transitions(state, g, valid_states)
+# for state in valid_states.keys():
+#     generate_transitions(state, g, valid_states)
 
-
+print(len(valid_states))
+# print("LOLLLLLLL still 27  states ")
 # print(valid_states) # keys: valid states, values: connected (&directed) states/edges
 # print(AMBIG_STATES)
-g.view()
+for state in valid_states:
+    print("Inflow:", state[TAP], "Volume:", state[SINK], "Height", state[HEIGHT], "Pressure", state[PRESSURE], "outflow",state[DRAIN])
+
+# g.view()
