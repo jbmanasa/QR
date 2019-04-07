@@ -87,6 +87,9 @@ def is_valid_no_magnitude_but_decresing(tap, sink, drain):
     if sink[MAGNITUDE] is '0' and sink[DERIVATIVE] is '-': return False
     if tap[MAGNITUDE] is '0' and tap[DERIVATIVE] is  '-': return False
     if drain[MAGNITUDE] is '0' and drain[DERIVATIVE] is '-': return False
+
+    if sink[MAGNITUDE] is 'MAX' and sink[DERIVATIVE] is '+': return False
+    if drain[MAGNITUDE] is 'MAX' and drain[DERIVATIVE] is '+': return False
     return True
 
 def is_valid_state(state):
@@ -125,7 +128,7 @@ print("Number of Invalid states = ", INVALID_STATE_COUNT)
     Generate Transitions -------------------------------------
     ----------------------------------------------------------"""
 
-def generate_transitions(state, graph, all_states):
+def generate_transitions2(state, graph, all_states):
     state1_name = str(state).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
     # print(state1_name)
     graph.node(state1_name)
@@ -177,12 +180,208 @@ def generate_transitions(state, graph, all_states):
             print("couldnt find:", str(state2))
 
 
+def affecting_connections (q1, val1, model, state2s):
+    for (ival, q2) in val1['I']:
+        influencer_mag = '+' if model[q1]['next'][0] == 'MAX' else model[q1]['next'][0]
+        if influencer_mag != '0':
+            new_derivative = influencer_mag if ival == '+' else ('+' if influencer_mag == '-' else '-')
+            if not (new_derivative == '+' and model[q2]['next'][0] == 'MAX'):
+                model[q2]['next'] = (model[q2]['next'][0], new_derivative)
+                # print('i', (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+                state2s.add((model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+
+    for (pval, q2) in val1['P']:
+        new_derivative = model[q1]['next'][1] if pval == '+' else ('+' if model[q1]['next'][1] == '-' else '-')
+        model[q2]['next'] = (model[q2]['next'][0], new_derivative)
+        # print('p', (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+        state2s.add((model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+
+    for (cval, q2) in val1['V']:  # correspond magnitudes
+        model[q2]['next'] = (model[q1]['next'][0], model[q2]['next'][1])
+        # print('v', (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+        state2s.add((model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+
+def generate_transitions(state, graph, all_states, model, next_val):
+    state1_name = str(state).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+    # print(state1_name)
+    graph.node(state1_name)
+    tap, sink, drain = state[0], state[1], state[2]
+    print('now:', tap, sink, drain)
+    model['inflow']['now'] = tap
+    model['volume']['now'] = sink
+    model['outflow']['now'] = drain
+
+    state2s = set()
+    for i, (q1, val1) in enumerate(model.items()):
+        model['inflow']['next'] = tap
+        model['volume']['next'] = sink
+        model['outflow']['next'] = drain
+
+        next_value = next_val[val1['now']]
+        # print(q1, val1['now'], '->', next_value)
+        state2 = None
+        if next_value:
+            model[q1]['next'] = next_value
+            state2s.add((model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+
+        for j, (q1, val1) in enumerate(model.items()):
+            # print(j, (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+            affecting_connections(q1, val1, model, state2s)
+
+        for j, (q1, val1) in enumerate(list(model.items())[::-1]):
+            # print(j, (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+            affecting_connections(q1, val1, model, state2s)
+
+    for state2 in list(state2s)[:]: # connect edges
+        if state2 in AMBIG_STATES:
+            state2s.add((state2[0], (state2[1][0], '-'), (state2[2][0], '-')))
+            state2s.add((state2[0], (state2[1][0], '0'), (state2[2][0], '0')))
+            state2s.add((state2[0], (state2[1][0], '+'), (state2[2][0], '+')))
+
+    for state2 in state2s: # connect edges
+        if state2 in all_states:
+            state2_name = str(state2).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+
+            if state2 not in all_states[state] and state2 != state:
+                graph.edge(state1_name, state2_name) # draw edge
+                all_states[state].append(state2)     # save edge
+        else:
+            print("couldnt find:", str(state2))
+
+def generate_transitions_inflow(state, graph, all_states, drawn, model, next_value):
+    state1_name = str(state).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+    # print(state1_name)
+    graph.node(state1_name)
+    tap, sink, drain = state[0], state[1], state[2]
+    print('now:', tap, sink, drain)
+    model['inflow']['now'] = tap
+    model['volume']['now'] = sink
+    model['outflow']['now'] = drain
+
+    state2s = set()
+    q1 = 'inflow'
+    val1 = model['inflow']
+    model['inflow']['next'] = tap
+    model['volume']['next'] = sink
+    model['outflow']['next'] = drain
+
+    state2 = None
+    if next_value:
+        model[q1]['next'] = next_value
+        state2s.add((model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+
+    for j, (q1, val1) in enumerate(model.items()):
+        # print(j, (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+        affecting_connections(q1, val1, model, state2s)
+
+    for j, (q1, val1) in enumerate(list(model.items())[::-1]):
+        # print(j, (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+        affecting_connections(q1, val1, model, state2s)
+
+    for state2 in list(state2s)[:]: # connect edges
+        if state2 in AMBIG_STATES:
+            state2s.add((state2[0], (state2[1][0], '-'), (state2[2][0], '-')))
+            state2s.add((state2[0], (state2[1][0], '0'), (state2[2][0], '0')))
+            state2s.add((state2[0], (state2[1][0], '+'), (state2[2][0], '+')))
+
+    for state2 in state2s: # connect edges
+        if state2 in all_states:
+            state2_name = str(state2).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+
+            if (state,state2) not in drawn and state2 != state:
+                print("found", state2)
+                graph.node(state2_name)
+                graph.edge(state1_name, state2_name) # draw edge
+                all_states[state].append(state2)     # save edge
+                drawn.append((state,state2))
+
+                # for state02 in all_states[state2]: # connextions
+                #     state02_name = str(state02).replace('MAX', 'max').replace(
+                #         '), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+                #     if (state2, state02) not in drawn:
+                #         print('draw:', (state2, state02) )
+                #         g1.node(state02_name)
+                #         g1.edge(state2_name, state02_name,color='red')
+                #         drawn.append((state2, state02))
+        else:
+            print("couldnt find:", str(state2))
+
+
 g = Digraph('G', filename='behavior_graph.gv')
-g.attr('edge',overlap='false')
+g.attr('edge', overlap='false')
+
+model = {'inflow': {'I': [('+', 'volume')],
+                    'P': [],
+                    'V': [],
+                    'now': None, 'next': None},
+         'volume': {'I': [],
+                    'P': [('+', 'outflow')],
+                    'V': [('MAX', 'outflow'), ('0', 'outflow'), ('+', 'outflow')],
+                    'now': None, 'next': None},
+         'outflow': {'I': [('-', 'volume')],
+                     'P': [],
+                     'V': [('MAX', 'volume'), ('0', 'volume'), ('+', 'outflow')],
+                     'now': None, 'next': None}
+         }
+
+next_val = {('0', '+'): ('+', '+'),
+            ('+', '+'): ('MAX', '0'),
+            ('+', '-'): ('0', '0'),
+            ('0', '0'): None,
+            ('+', '0'): None,
+            ('MAX', '0'): None,
+            ('MAX', '-'): ('+', '-')}
+
 for state in valid_states.keys():
-    generate_transitions(state, g, valid_states)
-
-
-# print(valid_states) # keys: valid states, values: connected (&directed) states/edges
-# print(AMBIG_STATES)
+    generate_transitions(state, g, valid_states, model, next_val)
 g.view()
+
+g1 = Digraph('G', filename='parabolic_inflow.gv')
+g1.attr('edge', overlap='false')
+
+inflow_behavior = [('0','+'),
+                   ('+', '+'),
+                   ('+', '0'),
+                   ('+', '-'),
+                   ('0', '0')]
+
+def branchout(state1, connections, g, valid_states, recurse=True):
+    state1_name = str(state).replace('MAX', 'max').replace(
+        '), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+    for state2 in connections:
+        state2_name = str(state2).replace('MAX', 'max').replace(
+            '), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+        g1.edge(state1_name, state2_name)
+        if recurse:
+            branchout(state2, valid_states[state2], g, valid_states, False)
+
+
+g1.node('start state', shape='Mdiamond')
+drawn = []
+for state, connections in valid_states.items():
+    if state[0] == inflow_behavior[0]:
+        state1_name = str(state).replace('MAX', 'max').replace(
+            '), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+        g1.node(state1_name)
+        g1.edge('start state', state1_name)
+        state1_name = str(state).replace('MAX', 'max').replace(
+            '), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+        for state2 in connections:
+            state2_name = str(state2).replace('MAX', 'max').replace(
+                '), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+
+            if (state, state2) not in drawn:
+                g1.edge(state1_name, state2_name)
+                drawn.append((state, state2))
+
+        for i in range(len(inflow_behavior)-1):
+            print(i)
+            for state0, connections0 in valid_states.items():
+                state01_name = str(state).replace('MAX', 'max').replace(
+                    '), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+                if state0[0] == inflow_behavior[i]:
+                    generate_transitions_inflow(state0, g1, valid_states, drawn, model, inflow_behavior[i+1])
+
+
+
+g1.view()
