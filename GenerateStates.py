@@ -11,13 +11,13 @@ PRESSURE = 4
 MAGNITUDE = 0
 DERIVATIVE = 1
 
-INFLOW_VALUES = {'0','+'}
-VOLUME_VALUES = {'0','+','MAX'}
-OUTFLOW_VALUES = {'0', '+', 'MAX'}
-PRESSURE_VALUES = {'0', '+', 'MAX'}
-HEIGHT_VALUES = {'0', '+', 'MAX'}
+INFLOW_VALUES = ['0','+']
+VOLUME_VALUES = ['0','+','MAX']
+OUTFLOW_VALUES = ['0', '+', 'MAX']
+PRESSURE_VALUES = ['0', '+', 'MAX']
+HEIGHT_VALUES = ['0', '+', 'MAX']
 
-CHANGE = {'0', '+', '-'}
+CHANGE = ['0', '+', '-']
 
 INFLOW_STATES = product(INFLOW_VALUES, CHANGE)
 VOLUME_STATES = product(VOLUME_VALUES, CHANGE)
@@ -169,52 +169,123 @@ print("Number of Invalid states = ", INVALID_STATE_COUNT)
     Generate Transitions -------------------------------------
     ----------------------------------------------------------"""
 
-def generate_transitions(state, graph, all_states):
-    state1_name = str(state).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
-    # print(state1_name)
-    graph.node(state1_name)
-    if state1_name.count('0')==6:
-        graph.node(state1_name, shape='doublecircle')
-    tap, sink, drain = state[0], state[1], state[2]
-    # print(tap, sink, drain)
+def get_next_landmark(quantity, current_landmark, derivative):
+    next_landmark = None
+    idx = None
+    if quantity is 'tap':
+        VALUES = INFLOW_VALUES
+    elif quantity is 'sink':
+        VALUES = VOLUME_VALUES
+    elif quantity is 'height':
+        VALUES = HEIGHT_VALUES
+    elif quantity is 'pressure':
+        VALUES = PRESSURE_VALUES
+    elif quantity is 'drain':
+        VALUES = OUTFLOW_VALUES
 
-    state2s = []
-    if sink == ('MAX', '-'):
-        state2s.append((tap, ('+', '-'), ('+', drain[1]))) # not max anymore, decreased
-    elif sink == ('0', '+'):
-        state2s.append((tap, ('+', '+'), ('+', drain[1]))) # not 0 anymore, increased
-    elif sink == ('+', '-'):
-        state2s.append((tap, ('0', '0'), ('0', '0'))) # TODO don't feel comfortable hardcoding x(
-    elif sink == ('+', '+'):
-        state2s.append((tap, ('+', 'MAX'), ('+', 'MAX'))) # Increased from + to max
-
-    if tap == ('+', '-'): # goes to 0
-        if drain == ('0', '0'):
-            state2s.append((('0', '0'), (sink[0], '0'), drain))  #TODO not sure correct approach
+    if derivative is '+':
+        idx = VALUES.index(current_landmark)
+        if idx == len(VALUES) - 1:
+            next_landmark = current_landmark
         else:
-            state2s.append((('0', '0'), sink, drain))
-
-    elif drain == ('+', '-'): # goes to zero
-            state2s.append((tap, ('0', '0'), ('0', '0')))
-
-    if tap == ('0', '+'):
-        graph.node(state1_name, color='blue')
-        state2s.append((('+', '+'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
-        state2s.append((('+', '-'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
-        state2s.append((('+', '0'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
-
-    if drain == ('0', '+'):
-        graph.node(state1_name, color='blue')
-        state2s.append((tap, ('+', sink[1]), ('+', sink[1])))
-
-    for state2 in state2s: # connect edges
-        if state2 in all_states:
-            state2_name = str(state2).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
-            if state2 not in all_states[state]:
-                graph.edge(state1_name, state2_name) # draw edge
-                all_states[state].append(state2)     # save edge
+            next_landmark = VALUES[idx+1]
+    elif derivative is '-':
+        idx = VALUES.index(current_landmark)
+        if idx == 0:
+            next_landmark = current_landmark
         else:
-            print("couldnt find:", str(state2))
+            next_landmark = VALUES[idx - 1]
+    else:
+        next_landmark = current_landmark
+    # if current_landmark == 'MAX' and derivative is '0':
+    #     print(next_landmark)
+    return (next_landmark, derivative)
+
+Graph_states = set()
+def create_nodes_and_edge(state1, state2, graph):
+    state1_name = str(state1).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace(
+        '\'', '')
+    state2_name = str(state2).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace(
+        '\'', '')
+    graph.node(state1_name, color='blue')
+    graph.node(state2_name, color='blue')
+    graph.edge(state1_name, state2_name)
+    Graph_states.add(state1_name)
+    Graph_states.add(state2_name)
+
+def transitions(state, graph, all_states):
+     tap, sink, drain, height, pressure = state[0], state[1], state[2], state[3], state[4]
+     next_landmark_tap = get_next_landmark('tap', tap[MAGNITUDE], tap[DERIVATIVE])
+     next_landmark_sink = get_next_landmark('sink', sink[MAGNITUDE], sink[DERIVATIVE])
+     next_landmark_drain = get_next_landmark('drain', drain[MAGNITUDE], drain[DERIVATIVE])
+     next_landmark_height = get_next_landmark('height', height[MAGNITUDE], height[DERIVATIVE])
+     next_landmark_pressure = get_next_landmark('pressure', pressure[MAGNITUDE], pressure[DERIVATIVE])
+     # print(next_landmark_tap, next_landmark_sink, next_landmark_height, next_landmark_pressure, next_landmark_drain)
+     tap_ps = set(list(product(tap, next_landmark_tap)))
+     sink_ps = set(list(product(sink, next_landmark_sink)))
+     # print(sink_ps)
+     drain_ps = set(list(product(drain, next_landmark_drain)))
+     height_ps = set(list(product(height, next_landmark_height)))
+     pressure_ps = set(list(product(pressure, next_landmark_pressure)))
+     sys_state_ps = product(tap_ps, sink_ps, drain_ps, height_ps, pressure_ps)
+     # print(list(sys_state_ps))
+     # next_state = (next_landmark_tap, next_landmark_sink,next_landmark_drain, next_landmark_height, next_landmark_pressure)
+     for next_state in list(sys_state_ps):
+         if next_state == state:
+             continue
+         if next_state in valid_states:
+            create_nodes_and_edge(state, next_state, graph)
+            # transitions(next_state, graph, all_states)
+         else:
+             None
+             # print("Invalid state from", state, "to", next_state)
+
+# def generate_transitions(state, graph, all_states):
+#     state1_name = str(state).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+#     # print(state1_name)
+#     graph.node(state1_name)
+#     if state1_name.count('0')==6:
+#         graph.node(state1_name, shape='doublecircle')
+#     tap, sink, drain = state[0], state[1], state[2]
+#     # print(tap, sink, drain)
+#
+#     state2s = []
+#     if sink == ('MAX', '-'):
+#         state2s.append((tap, ('+', '-'), ('+', drain[1]))) # not max anymore, decreased
+#     elif sink == ('0', '+'):
+#         state2s.append((tap, ('+', '+'), ('+', drain[1]))) # not 0 anymore, increased
+#     elif sink == ('+', '-'):
+#         state2s.append((tap, ('0', '0'), ('0', '0'))) # TODO don't feel comfortable hardcoding x(
+#     elif sink == ('+', '+'):
+#         state2s.append((tap, ('+', 'MAX'), ('+', 'MAX'))) # Increased from + to max
+#
+#     if tap == ('+', '-'): # goes to 0
+#         if drain == ('0', '0'):
+#             state2s.append((('0', '0'), (sink[0], '0'), drain))  #TODO not sure correct approach
+#         else:
+#             state2s.append((('0', '0'), sink, drain))
+#
+#     elif drain == ('+', '-'): # goes to zero
+#             state2s.append((tap, ('0', '0'), ('0', '0')))
+#
+#     if tap == ('0', '+'):
+#         graph.node(state1_name, color='blue')
+#         state2s.append((('+', '+'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
+#         state2s.append((('+', '-'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
+#         state2s.append((('+', '0'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
+#
+#     if drain == ('0', '+'):
+#         graph.node(state1_name, color='blue')
+#         state2s.append((tap, ('+', sink[1]), ('+', sink[1])))
+#
+#     for state2 in state2s: # connect edges
+#         if state2 in all_states:
+#             state2_name = str(state2).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+#             if state2 not in all_states[state]:
+#                 graph.edge(state1_name, state2_name) # draw edge
+#                 all_states[state].append(state2)     # save edge
+#         else:
+#             print("couldnt find:", str(state2))
 
 
 g = Digraph('G', filename='behavior_graph.gv', engine='sfdp')
@@ -222,11 +293,16 @@ g = Digraph('G', filename='behavior_graph.gv', engine='sfdp')
 # for state in valid_states.keys():
 #     generate_transitions(state, g, valid_states)
 
-print(len(valid_states))
+print("Number of nodes in graph", len(Graph_states))
 # print("LOLLLLLLL still 27  states ")
 # print(valid_states) # keys: valid states, values: connected (&directed) states/edges
 # print(AMBIG_STATES)
-for state in valid_states:
-    print("Inflow:", state[TAP], "Volume:", state[SINK], "Height", state[HEIGHT], "Pressure", state[PRESSURE], "outflow",state[DRAIN])
+# for state in valid_states:
+#     print("Inflow:", state[TAP], "Volume:", state[SINK], "Height", state[HEIGHT], "Pressure", state[PRESSURE], "outflow",state[DRAIN])
 
-# g.view()
+for key, val in valid_states.items():
+    transitions(key, g, valid_states)
+    # break
+# transitions((('0', '+'), ('0', '0'), ('0', '0'), ('0', '0'), ('0', '0')), g, valid_states)
+# transitions((('+', '+'), ('MAX', '0'), ('MAX', '0'), ('MAX', '0'), ('MAX', '0')), g, valid_states)
+g.view()
