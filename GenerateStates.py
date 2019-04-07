@@ -113,6 +113,9 @@ def is_valid_zero_volume_state(sink, drain, height, pressure):
 def is_valid_no_magnitude_but_decresing(quantity):
     if quantity[MAGNITUDE] is '0' and quantity[DERIVATIVE] is '-': return False
     return True
+def is_valid_max_magnitude_but_increasing(quantity):
+    if quantity[MAGNITUDE] is 'MAX' and quantity[DERIVATIVE] is '+': return False
+    return True
 
 def is_equal_magnitude_state(quantity_1, quantity_2):
     if quantity_1[MAGNITUDE] != quantity_2[MAGNITUDE]:
@@ -131,6 +134,9 @@ def is_valid_state(state):
     for quantity in state:
         if not is_valid_no_magnitude_but_decresing(quantity):
             return False
+        if not is_valid_max_magnitude_but_increasing(quantity):
+            return False
+
     if not is_valid__positive_proportional(state[SINK], state[HEIGHT]):
         return False
     if not is_valid__positive_proportional(state[HEIGHT], state[PRESSURE]):
@@ -139,12 +145,12 @@ def is_valid_state(state):
         return False
     if not is_valid_pressure_outflow_state(state[PRESSURE], state[DRAIN]):
         return False
-    # if not is_equal_magnitude_state(state[SINK], state[HEIGHT]): #Not sure if this is correct
-    #     return False
-    # if not is_equal_magnitude_state(state[HEIGHT], state[PRESSURE]): #Not sure if this is correct
-    #     return False
-    # if not is_equal_magnitude_state(state[PRESSURE], state[DRAIN]): #Not sure if this is correct
-    #     return False
+    if not is_equal_magnitude_state(state[SINK], state[HEIGHT]): #Not sure if this is correct
+        return False
+    if not is_equal_magnitude_state(state[HEIGHT], state[PRESSURE]): #Not sure if this is correct
+        return False
+    if not is_equal_magnitude_state(state[PRESSURE], state[DRAIN]): #Not sure if this is correct
+        return False
     return True
 
 
