@@ -20,7 +20,7 @@ VOLUME_STATES = product(VOLUME_VALUES, CHANGE)
 OUTFLOW_STATES = product(OUTFLOW_VALUES, CHANGE)
 
 SYSTEM_STATES = product(list(INFLOW_STATES), list(VOLUME_STATES), list(OUTFLOW_STATES))
-TRACE_TOGGLE = False
+TRACE_TOGGLE = True
 # for idx, sys_state in enumerate(list(SYSTEM_STATES)):
 #     print(idx, "Tap :" ,sys_state[0], "SINK : ", sys_state[1], "Drain : ", sys_state[2])
 AMBIG_STATES = []
@@ -293,7 +293,7 @@ def graph_from_behavior(g1, inflow_behavior, valid_states):
             state1_name = get_name(state0)
             g1.node(state1_name)
             if TRACE_TOGGLE:
-                g1.edge('start state', state1_name, label='initial state\n' + get_trace('start state', state))
+                g1.edge('start state', state1_name, label='initial state\n' + get_trace('start state', state, TRACE_TOGGLE))
             else:
                 g1.edge('start state', state1_name)
             drawn.add(('start state', state0))
@@ -345,7 +345,7 @@ for state in valid_states.keys():
     generate_transitions(state, g, valid_states, model, next_val)
 g.view()
 
-g1 = Digraph('G', filename='parabolic_inflow_3.gv')
+g1 = Digraph('G', filename='trace_parabolic_inflow_3.gv')
 g1.attr(size='6,6')
 g1.node_attr.update(color='lightblue2', style='filled')
 
@@ -358,7 +358,7 @@ inflow_behavior = [('0','+'),
 graph_from_behavior(g1, inflow_behavior, valid_states)
 g1.view()
 
-g2 = Digraph('G', filename='decreasing_inflow_3.gv')
+g2 = Digraph('G', filename='trace_decreasing_inflow_3.gv')
 g2.node_attr.update(color='cornflowerblue', style='filled')
 g2.attr('edge', overlap='false')
 
