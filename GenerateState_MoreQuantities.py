@@ -27,8 +27,6 @@ HEIGHT_STATES = product(HEIGHT_VALUES, CHANGE)
 
 SYSTEM_STATES = product(list(INFLOW_STATES), list(VOLUME_STATES), list(OUTFLOW_STATES), list(HEIGHT_STATES), list(PRESSURE_STATES))
 
-# for idx, sys_state in enumerate(list(SYSTEM_STATES)):
-#     print(idx, "Tap :" ,sys_state[0], "SINK : ", sys_state[1], "Drain : ", sys_state[2])
 AMBIG_STATES = []
 def get_influence(mag, influence):
     result_change = ''
@@ -44,15 +42,12 @@ def get_influence(mag, influence):
             result_change = '+'
         else:
             result_change = '-'
-    else:
-        print("Not handled!!") # TODO ?
     return result_change
 
 def total_influence(i1, i2, isign1, isign2):
     if i1=='0': return i2
     if i2=='0': return i1
     if i1!=i2: # only possiblity is +,-
-        # print("ambiguous", i1, i2, isign1, isign2)
         return 'ambigious' # alternatively can return 0 (assuming they work at the same rate)
     return i1 # they're the same
 
@@ -161,98 +156,35 @@ valid_states = {}
 for sys_state in list(SYSTEM_STATES):
     if not is_valid_state(sys_state):
         INVALID_STATE_COUNT += 1
-        # print("----------- : ", "Tap :" ,sys_state[TAP], "SINK : ", sys_state[SINK], "Drain : ", sys_state[DRAIN])
     else:
         VALID_STATE_COUNT += 1
         valid_states[sys_state]=[]
-        # print("Valid State : ", "Tap :", sys_state[TAP], "SINK : ", sys_state[SINK], "Drain : ", sys_state[DRAIN])
 
 print("Number of Valid states = ", VALID_STATE_COUNT)
 print("Number of Invalid states = ", INVALID_STATE_COUNT)
 
 """ ----------------------------------------------------------
     Generate Transitions -------------------------------------
+    ----------------------------------------------------------
+    these functions are exactly same as the other py file, yet
+    we've decided to copy them here for the time being -------
     ----------------------------------------------------------"""
-
-def get_next_landmark(quantity, current_landmark, derivative):
-    next_landmark = None
-    idx = None
-    if quantity is 'tap':
-        VALUES = INFLOW_VALUES
-    elif quantity is 'sink':
-        VALUES = VOLUME_VALUES
-    elif quantity is 'height':
-        VALUES = HEIGHT_VALUES
-    elif quantity is 'pressure':
-        VALUES = PRESSURE_VALUES
-    elif quantity is 'drain':
-        VALUES = OUTFLOW_VALUES
-
-    if derivative is '+':
-        idx = VALUES.index(current_landmark)
-        if idx == len(VALUES) - 1:
-            next_landmark = current_landmark
-        else:
-            next_landmark = VALUES[idx+1]
-    elif derivative is '-':
-        idx = VALUES.index(current_landmark)
-        if idx == 0:
-            next_landmark = current_landmark
-        else:
-            next_landmark = VALUES[idx - 1]
-    else:
-        next_landmark = current_landmark
-    # if current_landmark == 'MAX' and derivative is '0':
-    #     print(next_landmark)
-    return (next_landmark, derivative)
-
-Graph_states = set()
-def create_nodes_and_edge(state1, state2, graph):
-    state1_name = str(state1).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace(
-        '\'', '')
-    state2_name = str(state2).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace(
-        '\'', '')
-    graph.node(state1_name, color='blue')
-    graph.node(state2_name, color='blue')
-    graph.edge(state1_name, state2_name)
-    Graph_states.add(state1_name)
-    Graph_states.add(state2_name)
-
-def transitions(state, graph, all_states):
-     tap, sink, drain, height, pressure = state[0], state[1], state[2], state[3], state[4]
-     next_landmark_tap = get_next_landmark('tap', tap[MAGNITUDE], tap[DERIVATIVE])
-     next_landmark_sink = get_next_landmark('sink', sink[MAGNITUDE], sink[DERIVATIVE])
-     next_landmark_drain = get_next_landmark('drain', drain[MAGNITUDE], drain[DERIVATIVE])
-     next_landmark_height = get_next_landmark('height', height[MAGNITUDE], height[DERIVATIVE])
-     next_landmark_pressure = get_next_landmark('pressure', pressure[MAGNITUDE], pressure[DERIVATIVE])
-     # print(next_landmark_tap, next_landmark_sink, next_landmark_height, next_landmark_pressure, next_landmark_drain)
-     tap_ps = set(list(product(tap, next_landmark_tap)))
-     sink_ps = set(list(product(sink, next_landmark_sink)))
-     # print(sink_ps)
-     drain_ps = set(list(product(drain, next_landmark_drain)))
-     height_ps = set(list(product(height, next_landmark_height)))
-     pressure_ps = set(list(product(pressure, next_landmark_pressure)))
-     sys_state_ps = product(tap_ps, sink_ps, drain_ps, height_ps, pressure_ps)
-     # print(list(sys_state_ps))
-     # next_state = (next_landmark_tap, next_landmark_sink,next_landmark_drain, next_landmark_height, next_landmark_pressure)
-     for next_state in list(sys_state_ps):
-         if next_state == state:
-             continue
-         if next_state in valid_states:
-            create_nodes_and_edge(state, next_state, graph)
-            # transitions(next_state, graph, all_states)
-         else:
-             None
-             # print("Invalid state from", state, "to", next_state)
 
 def affecting_connections (q1, val1, model, state2s):
     for (ival, q2) in val1['I']:
         influencer_mag = '+' if model[q1]['next'][0] == 'MAX' else model[q1]['next'][0]
+        new_derivative = None
         if influencer_mag != '0':
             new_derivative = influencer_mag if ival == '+' else ('+' if influencer_mag == '-' else '-')
-            if not (new_derivative == '+' and model[q2]['next'][0] == 'MAX'):
-                model[q2]['next'] = (model[q2]['next'][0], new_derivative)
-                state2s.add(get_next_assignment(model))
+        else:
+            if model[q2]['next'][1] == '+' and ival == '+':
+                new_derivative = '0'
+            elif model[q2]['next'][1] == '-' and ival == '-':
+                new_derivative = '0'
+
+        if new_derivative is not None and not (new_derivative == '+' and model[q2]['next'][0] == 'MAX'):
+            model[q2]['next'] = (model[q2]['next'][0], new_derivative)
+            state2s.add(get_next_assignment(model))
 
     for (pval, q2) in val1['P']:
         new_derivative = model[q1]['next'][1] if pval == '+' else ('+' if model[q1]['next'][1] == '-' else '-')
@@ -264,8 +196,6 @@ def affecting_connections (q1, val1, model, state2s):
         state2s.add(get_next_assignment(model))
 
 def get_name(state):
-    # return str(state).replace('MAX', 'max').replace(
-    #     '), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
     node_name = ""
     names = ['I (', 'V (', 'O (', 'H (', 'P (']
     for i, quantity in enumerate(state):
@@ -273,47 +203,37 @@ def get_name(state):
         if i != len(state)-1: node_name+='\n'
     return node_name
 
-
 def generate_transitions(state, graph, all_states, model, next_val):
     state1_name = get_name(state)
     graph.node(state1_name)
-    tap, sink, drain, height, pressure = state
-    print('now:', tap, sink, drain, height, pressure)
-    model['inflow']['now'] = tap
-    model['volume']['now'] = sink
-    model['outflow']['now'] = drain
-    model['height']['now'] = height
-    model['pressure']['now'] = pressure
+    for i, key in enumerate(list(model.keys())):
+        model[key]['now'] = state[i]
 
     state2s = set()
     for i, (q1, val1) in enumerate(model.items()):
-        model['inflow']['next'] = tap
-        model['volume']['next'] = sink
-        model['outflow']['next'] = drain
-        model['height']['next'] = height
-        model['pressure']['next'] = pressure
+            for j, key in enumerate(list(model.keys())):
+                model[key]['next'] = state[j]
 
-        next_value = next_val[val1['now']]
-        if next_value:
-            model[q1]['next'] = next_value
-            state2s.add(get_next_assignment(model))
+            next_value = next_val[val1['now']]
+            if next_value:
+                model[q1]['next'] = next_value
+                state2s.add(get_next_assignment(model))
 
-        for j, (q1, val1) in enumerate(model.items()):
-            affecting_connections(q1, val1, model, state2s)
+            for j, (q1, val1) in enumerate(model.items()):
+                affecting_connections(q1, val1, model, state2s)
 
-        for j, (q1, val1) in enumerate(list(model.items())[::-1]):
-            affecting_connections(q1, val1, model, state2s)
+            for j, (q1, val1) in enumerate(list(model.items())[::-1]):
+                affecting_connections(q1, val1, model, state2s)
 
     for state2 in list(state2s)[:]: # connect edges
         if state2 in AMBIG_STATES:
-            state2s.add((state2[0], (state2[1][0], '-'), (state2[2][0], '-'), (state2[3][0], '-'), (state2[4][0], '-')))
-            state2s.add((state2[0], (state2[1][0], '0'), (state2[2][0], '0'), (state2[3][0], '0'), (state2[4][0], '0')))
-            state2s.add((state2[0], (state2[1][0], '+'), (state2[2][0], '+'), (state2[3][0], '+'), (state2[4][0], '+')))
+            state2s.add(get_ambigious_state(state2, '-'))
+            state2s.add(get_ambigious_state(state2, '0'))
+            state2s.add(get_ambigious_state(state2, '+'))
 
     for state2 in state2s: # connect edges
         if state2 in all_states:
             state2_name = get_name(state2)
-
             if state2 not in all_states[state] and state2 != state:
                 graph.edge(state1_name, state2_name) # draw edge
                 all_states[state].append(state2)     # save edge
@@ -326,29 +246,27 @@ def get_next_assignment(model):
         t += (val['next'], )
     return t
 
+def get_ambigious_state(state, derivative):
+    t = (state[0],)
+    for i in range(len(state)-1):
+        t += ((state[i+1][0], derivative), )
+    return t
+
 def generate_transitions_inflow(state, graph, all_states, drawn, model, next_value):
     state1_name = get_name(state)
     graph.node(state1_name)
-    tap, sink, drain, height, pressure = state
-    print('now:', tap, sink, drain, height, pressure)
-    model['inflow']['now'] = tap
-    model['volume']['now'] = sink
-    model['outflow']['now'] = drain
-    model['height']['now'] = height
-    model['pressure']['now'] = pressure
+
+    for i, key in enumerate(list(model.keys())):
+        model[key]['now'] = state[i]
+        model[key]['next'] = state[i]
 
     state2s = set()
     q1 = 'inflow' # we are just interested in next state of inflow
     val1 = model['inflow']
-    model['inflow']['next'] = tap
-    model['volume']['next'] = sink
-    model['outflow']['next'] = drain
-    model['height']['next'] = height
-    model['pressure']['next'] = pressure
 
-    if next_value: #MAP TO NEXT STATE/BEHAVIOR
-        model[q1]['next'] = next_value
-        state2s.add(get_next_assignment(model))
+    #MAP TO NEXT STATE/BEHAVIOR
+    model[q1]['next'] = next_value
+    state2s.add(get_next_assignment(model))
 
     for j, (q1, val1) in enumerate(model.items()):
         affecting_connections(q1, val1, model, state2s) # value corres. proportion, influence
@@ -358,60 +276,72 @@ def generate_transitions_inflow(state, graph, all_states, drawn, model, next_val
 
     for state2 in list(state2s)[:]: # handle ambigious seperately in case not handled.
         if state2 in AMBIG_STATES:
-            state2s.add((state2[0], (state2[1][0], '-'), (state2[2][0], '-'), (state2[3][0], '-'), (state2[4][0], '-')))
-            state2s.add((state2[0], (state2[1][0], '0'), (state2[2][0], '0'), (state2[3][0], '0'), (state2[4][0], '0')))
-            state2s.add((state2[0], (state2[1][0], '+'), (state2[2][0], '+'), (state2[3][0], '+'), (state2[4][0], '+')))
+            state2s.add(get_ambigious_state(state2, '-'))
+            state2s.add(get_ambigious_state(state2, '0'))
+            state2s.add(get_ambigious_state(state2, '+'))
 
     for state2 in state2s: # connect edges
-        if state2 in all_states:
+        if state2 in all_states.keys():
             state2_name = get_name(state2)
 
             if (state,state2) not in drawn and state2 != state:
-                print("found", state2)
                 graph.node(state2_name)
-                graph.edge(state1_name, state2_name, label='trace') # draw edge
+                graph.edge(state1_name, state2_name, label=get_trace(state, state2)) # draw edge
                 all_states[state].append(state2)     # save edge
                 drawn.add((state,state2))
         else:
             print("couldnt find:", str(state2))
 
+
+def get_trace(state1, state2):
+    if state1[0] != state2[0]:
+        inflow = state2[0]
+        if inflow == ('+', '+'): return 'opening\n the tap more'
+        elif inflow == ('+', '0'): return 'stabilizing\ntap'
+        elif inflow == ('+', '-'): return 'slowly\nclosing\ntap'
+        elif inflow == ('0', '0'): return 'closed\ntap'
+        elif inflow == ('0', '+'): return 'opened\ntap'
+    else:
+        volume = state2[1]
+        if volume == ('+', '+'): return 'water increasing\n& more draining'
+        elif volume == ('+', '0'): return 'water in sink\nstabilizes'
+        elif volume == ('+', '-'): return 'water decreasing\n& less draining'
+        elif volume == ('0', '0'): return 'all water\nis drained'
+        elif volume == ('0', '+'): return 'sink is starting\nto fill w/water'
+        elif volume == ('MAX', '0'): return 'the sink\nis full'
+        elif volume == ('MAX', '-'): return 'water decreasing\n& less draining'
+    return ''
+
+
 def graph_from_behavior(g1, inflow_behavior, valid_states):
     g1.node('start state', shape='Mdiamond')
     drawn = set()
-    for state, connections in valid_states.items():
-        if state[0] == inflow_behavior[0]:  # FIND START STATES
-            state1_name = get_name(state)
+    for state0, connections0 in valid_states.items():
+        if state0[0] == inflow_behavior[0] and ('start state', state0) not in drawn:  # START STATES
+            state1_name = get_name(state0)
             g1.node(state1_name)
-            g1.edge('start state', state1_name, label='initial state')
+            g1.edge('start state', state1_name, label='initial state\n' + get_trace('start state', state))
+            drawn.add(('start state', state0))
 
-            # for state2 in connections: # PUT IN CONNECTIONS OF START STATES (NOT NECESSARY ANYMORE)
-            #     state2_name = get_name(state2)
-            #     if (state, state2) not in drawn:
-            #         g1.edge(state1_name, state2_name)
-            #         drawn.add((state, state2))
+        for i in range(len(inflow_behavior)):  # MAP TO NEXT EXOGENOUS INFLOW STATE
+            if i<len(inflow_behavior)-1:
+                if state0[0] == inflow_behavior[i]:
+                    generate_transitions_inflow(state0, g1, valid_states, drawn, model, inflow_behavior[i + 1])
+            if state0[0] == inflow_behavior[i]: # if its the last state, branch out from it #TODO -1 OR i
+                state0_name = get_name(state0)
 
-            for i in range(len(inflow_behavior) - 1):  # MAP TO NEXT EXOGENOUS INFLOW STATE
-                for state0, connections0 in valid_states.items():
-                    if state0[0] == inflow_behavior[i]:
-                        generate_transitions_inflow(state0, g1, valid_states, drawn, model, inflow_behavior[i + 1])
+                for state02 in connections0:  # connextions
+                    if state0[0] == state02[0]:
+                        state02_name = get_name(state02)
 
-                for state0, connections0 in valid_states.items():  # PUT IN THE CONNECTIONS OF THE FINAL INFLOW STATE
-                    if state0[0] == inflow_behavior[-1]:
-                        state0_name = get_name(state0)
-
-                        for state02 in connections0:  # connextions
-                            if state0[0] == state02[0]:
-                                state02_name = get_name(state02)
-
-                                if (state0, state02) not in drawn and state0 != state02: #DRAW EDGE
-                                    g1.node(state02_name)
-                                    g1.edge(state0_name, state02_name, label='trace')
-                                    drawn.add((state0, state02))
+                        if (state0, state02) not in drawn and state0 != state02: #DRAW EDGE
+                            g1.node(state02_name)
+                            g1.edge(state0_name, state02_name, label=get_trace(state0, state02))
+                            drawn.add((state0, state02))
 
 g = Digraph('G', filename='behavior_graph5.gv')
 g.attr('edge', overlap='false')
 
-print("Number of nodes in graph", len(Graph_states))
 
 model = {'inflow': {'I': [('+', 'volume')],
                     'P': [],
@@ -456,6 +386,7 @@ for state in valid_states.keys():
 g.view()
 
 g1 = Digraph('G', filename='parabolic_inflow5.gv')
+g1.node_attr.update(color='lightblue2', style='filled')
 g1.attr('edge', overlap='false')
 
 inflow_behavior = [('0','+'),
@@ -466,6 +397,4 @@ inflow_behavior = [('0','+'),
 
 graph_from_behavior(g1, inflow_behavior, valid_states)
 g1.view()
-
-
 
