@@ -339,7 +339,9 @@ def graph_from_behavior(g1, inflow_behavior, valid_states):
                             g1.edge(state0_name, state02_name, label=get_trace(state0, state02))
                             drawn.add((state0, state02))
 
-g = Digraph('G', filename='behavior_graph5.gv')
+g = Digraph('G', filename='general_behavior_graph_5.gv')
+g.node_attr.update(color='darkolivegreen1', style='filled')
+
 g.attr('edge', overlap='false')
 
 
@@ -385,7 +387,7 @@ for state in valid_states.keys():
     generate_transitions(state, g, valid_states, model, next_val)
 g.view()
 
-g1 = Digraph('G', filename='parabolic_inflow5.gv')
+g1 = Digraph('G', filename='parabolic_inflow_5.gv')
 g1.node_attr.update(color='lightblue2', style='filled')
 g1.attr('edge', overlap='false')
 
@@ -398,3 +400,13 @@ inflow_behavior = [('0','+'),
 graph_from_behavior(g1, inflow_behavior, valid_states)
 g1.view()
 
+g2 = Digraph('G', filename='decreasing_inflow_5.gv')
+g2.node_attr.update(color='cornflowerblue', style='filled')
+g2.attr('edge', overlap='false')
+
+inflow_behavior = [('+','0'),
+                   ('+', '-'),
+                   ('0', '0')]
+
+graph_from_behavior(g2, inflow_behavior, valid_states)
+g2.view()

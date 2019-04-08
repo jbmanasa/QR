@@ -20,7 +20,7 @@ VOLUME_STATES = product(VOLUME_VALUES, CHANGE)
 OUTFLOW_STATES = product(OUTFLOW_VALUES, CHANGE)
 
 SYSTEM_STATES = product(list(INFLOW_STATES), list(VOLUME_STATES), list(OUTFLOW_STATES))
-
+TRACE_TOGGLE = False
 # for idx, sys_state in enumerate(list(SYSTEM_STATES)):
 #     print(idx, "Tap :" ,sys_state[0], "SINK : ", sys_state[1], "Drain : ", sys_state[2])
 AMBIG_STATES = []
@@ -255,14 +255,16 @@ def generate_transitions_inflow(state, graph, all_states, drawn, model, next_val
             if (state,state2) not in drawn and state2 != state:
                 print("found", state2)
                 graph.node(state2_name)
-                graph.edge(state1_name, state2_name, label=get_trace(state, state2)) # draw edge
+                graph.edge(state1_name, state2_name, label=get_trace(state, state2, TRACE_TOGGLE)) # draw edge
                 all_states[state].append(state2)     # save edge
                 drawn.add((state,state2))
         else:
             print("couldnt find:", str(state2))
 
 
-def get_trace(state1, state2):
+def get_trace(state1, state2, toggle):
+    if not toggle:
+        return ''
     if state1[0] != state2[0]:
         inflow = state2[0]
         if inflow == ('+', '+'): return 'opening\n the tap more'
@@ -290,7 +292,10 @@ def graph_from_behavior(g1, inflow_behavior, valid_states):
         if state0[0] == inflow_behavior[0] and ('start state', state0) not in drawn:  # START STATES
             state1_name = get_name(state0)
             g1.node(state1_name)
-            g1.edge('start state', state1_name, label='initial state\n' + get_trace('start state', state))
+            if TRACE_TOGGLE:
+                g1.edge('start state', state1_name, label='initial state\n' + get_trace('start state', state))
+            else:
+                g1.edge('start state', state1_name)
             drawn.add(('start state', state0))
 
         for i in range(len(inflow_behavior)):  # MAP TO NEXT EXOGENOUS INFLOW STATE
@@ -307,10 +312,11 @@ def graph_from_behavior(g1, inflow_behavior, valid_states):
 
                         if (state0, state02) not in drawn and state0 != state02: #DRAW EDGE
                             g1.node(state02_name)
-                            g1.edge(state0_name, state02_name, label=get_trace(state0, state02))
+                            g1.edge(state0_name, state02_name, label=get_trace(state0, state02, TRACE_TOGGLE))
                             drawn.add((state0, state02))
 
-g = Digraph('G', filename='behavior_graph.gv')
+g = Digraph('G', filename='general_behavior_graph_3.gv')
+g.node_attr.update(color='darkolivegreen1', style='filled')
 # g.attr('edge', overlap='false')
 
 model = {'inflow': {'I': [('+', 'volume')],
@@ -339,9 +345,9 @@ for state in valid_states.keys():
     generate_transitions(state, g, valid_states, model, next_val)
 g.view()
 
-g1 = Digraph('G', filename='parabolic_inflow.gv')
+g1 = Digraph('G', filename='parabolic_inflow_3.gv')
+g1.attr(size='6,6')
 g1.node_attr.update(color='lightblue2', style='filled')
-# g1.attr('edge', overlap='false')
 
 inflow_behavior = [('0','+'),
                    ('+', '+'),
@@ -352,7 +358,7 @@ inflow_behavior = [('0','+'),
 graph_from_behavior(g1, inflow_behavior, valid_states)
 g1.view()
 
-g2 = Digraph('G', filename='decreasing_inflow.gv')
+g2 = Digraph('G', filename='decreasing_inflow_3.gv')
 g2.node_attr.update(color='cornflowerblue', style='filled')
 g2.attr('edge', overlap='false')
 
@@ -362,7 +368,6 @@ inflow_behavior = [('+','0'),
 
 graph_from_behavior(g2, inflow_behavior, valid_states)
 g2.view()
-
 
 # g3 = Digraph('G', filename='sinusoidal_inflow.gv')
 # g3.attr('edge', overlap='false')
@@ -380,3 +385,4 @@ g2.view()
 #
 # graph_from_behavior(g3, inflow_behavior, valid_states)
 # g3.view()
+
