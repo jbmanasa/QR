@@ -128,80 +128,34 @@ print("Number of Invalid states = ", INVALID_STATE_COUNT)
     Generate Transitions -------------------------------------
     ----------------------------------------------------------"""
 
-def generate_transitions2(state, graph, all_states):
-    state1_name = str(state).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
-    # print(state1_name)
-    graph.node(state1_name)
-    if state1_name.count('0')==6:
-        graph.node(state1_name, shape='doublecircle')
-    tap, sink, drain = state[0], state[1], state[2]
-    # print(tap, sink, drain)
-
-    state2s = []
-    if sink == ('MAX', '-'):
-        state2s.append((tap, ('+', '-'), ('+', drain[1]))) # not max anymore, decreased
-    elif sink == ('0', '+'):
-        state2s.append((tap, ('+', '+'), ('+', drain[1]))) # not 0 anymore, increased
-    elif sink == ('+', '-'):
-        state2s.append((tap, ('0', '0'), ('0', '0'))) # TODO don't feel comfortable hardcoding x(
-    elif sink == ('+', '+'):
-        state2s.append((tap, ('MAX', '0'), ('MAX', '0'))) #TODO hmm
-
-    if tap == ('+', '-'): # goes to 0
-        if drain == ('0', '0'):
-            state2s.append((('0', '0'), (sink[0], '0'), drain))  #TODO not sure correct approach
-        else:
-            state2s.append((('0', '0'), sink, drain))
-    elif tap == ('0', '+'):
-        state2s.append((('+', '+'), ('+', sink[1]), ('+', drain[1])))  # not 0 anymore, increased
-
-    if tap[0] == '+':
-        if drain != ('0', '0'):
-            state2s.append((tap, (sink[0], '0'), (drain[0], '0')))
-            state2s.append((tap, (sink[0], '-'), (drain[0], '-')))
-            state2s.append((tap, (sink[0], '+'), (drain[0], '+')))
-
-    if drain == ('+', '-'): # goes to zero
-        state2s.append((tap, ('0', '0'), ('0', '0')))
-    elif drain == ('0', '+'):
-        state2s.append((tap, ('+', sink[1]), ('+', sink[1])))
-
-    for state2 in state2s: # connect edges
-        if state2 in all_states:
-            state2_name = str(state2).replace('MAX', 'max').replace('), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
-
-            if tap[0] == '+':
-                if drain != ('0', '0'):
-                    graph.node(state1_name, color='red')
-            if state2 not in all_states[state]:
-                graph.edge(state1_name, state2_name) # draw edge
-                all_states[state].append(state2)     # save edge
-        else:
-            print("couldnt find:", str(state2))
-
 def get_name(state):
-    return str(state).replace('MAX', 'max').replace(
-        '), (', '\n').replace('(', '').replace(')', '').replace('\'', '')
+    node_name = ""
+    names = ['I (', 'V (', 'O (', 'H (', 'P (']
+    for i, quantity in enumerate(state):
+        node_name += names[i] + str(quantity).replace('MAX', 'max').replace('(', '').replace(')', '').replace('\'', '') + ')'
+        if i != len(state)-1: node_name+='\n'
+    return node_name
 
 def affecting_connections (q1, val1, model, state2s):
+    print('ac', get_next_assignment(model))
     for (ival, q2) in val1['I']:
         influencer_mag = '+' if model[q1]['next'][0] == 'MAX' else model[q1]['next'][0]
         if influencer_mag != '0':
             new_derivative = influencer_mag if ival == '+' else ('+' if influencer_mag == '-' else '-')
             if not (new_derivative == '+' and model[q2]['next'][0] == 'MAX'):
                 model[q2]['next'] = (model[q2]['next'][0], new_derivative)
-                # print('i', (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+                print('i', (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
                 state2s.add((model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
 
     for (pval, q2) in val1['P']:
         new_derivative = model[q1]['next'][1] if pval == '+' else ('+' if model[q1]['next'][1] == '-' else '-')
         model[q2]['next'] = (model[q2]['next'][0], new_derivative)
-        # print('p', (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+        print('p', (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
         state2s.add((model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
 
     for (cval, q2) in val1['V']:  # correspond magnitudes
         model[q2]['next'] = (model[q1]['next'][0], model[q2]['next'][1])
-        # print('v', (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+        print('v', (model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
         state2s.add((model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
 
 def generate_transitions(state, graph, all_states, model, next_val):
@@ -247,6 +201,12 @@ def generate_transitions(state, graph, all_states, model, next_val):
         else:
             print("couldnt find:", str(state2))
 
+def get_next_assignment(model):
+    t = ()
+    for key,val in model.items():
+        t += (val['next'], )
+    return t
+
 def generate_transitions_inflow(state, graph, all_states, drawn, model, next_value):
     state1_name = get_name(state)
     graph.node(state1_name)
@@ -265,12 +225,14 @@ def generate_transitions_inflow(state, graph, all_states, drawn, model, next_val
 
     if next_value: #MAP TO NEXT STATE/BEHAVIOR
         model[q1]['next'] = next_value
-        state2s.add((model['inflow']['next'], model['volume']['next'], model['outflow']['next']))
+        state2s.add(get_next_assignment(model))
 
+    print('not reverse')
     for j, (q1, val1) in enumerate(model.items()):
         affecting_connections(q1, val1, model, state2s) # value corres. proportion, influence
 
     for j, (q1, val1) in enumerate(list(model.items())[::-1]):
+        print('reverse')
         affecting_connections(q1, val1, model, state2s)
 
     for state2 in list(state2s)[:]: # handle ambigious seperately in case not handled.
@@ -286,11 +248,23 @@ def generate_transitions_inflow(state, graph, all_states, drawn, model, next_val
             if (state,state2) not in drawn and state2 != state:
                 print("found", state2)
                 graph.node(state2_name)
-                graph.edge(state1_name, state2_name) # draw edge
+                graph.edge(state1_name, state2_name, label=get_trace(state, state2)) # draw edge
                 all_states[state].append(state2)     # save edge
                 drawn.add((state,state2))
         else:
             print("couldnt find:", str(state2))
+
+
+def get_trace(state1, state2):
+    if state1[0] != state2[0]:
+        inflow = state2[0]
+        if inflow == ('+,+'): return 'opening tap more'
+        elif inflow == ('+', '0'): return 'stabilizing tap'
+        elif inflow == ('+', '-'): return 'closing tap'
+        elif inflow == ('0', '0'): return 'closed tap'
+        elif inflow == ('0', '+'): return 'opened tap'
+
+
 
 def graph_from_behavior(g1, inflow_behavior, valid_states):
     g1.node('start state', shape='Mdiamond')
@@ -299,13 +273,7 @@ def graph_from_behavior(g1, inflow_behavior, valid_states):
         if state[0] == inflow_behavior[0]:  # FIND START STATES
             state1_name = get_name(state)
             g1.node(state1_name)
-            g1.edge('start state', state1_name)
-
-            # for state2 in connections: # PUT IN CONNECTIONS OF START STATES (NOT NECESSARY ANYMORE)
-            #     state2_name = get_name(state2)
-            #     if (state, state2) not in drawn:
-            #         g1.edge(state1_name, state2_name)
-            #         drawn.add((state, state2))
+            g1.edge('start state', state1_name, label='initial state')
 
             for i in range(len(inflow_behavior) - 1):  # MAP TO NEXT EXOGENOUS INFLOW STATE
                 for state0, connections0 in valid_states.items():
@@ -317,12 +285,13 @@ def graph_from_behavior(g1, inflow_behavior, valid_states):
                         state0_name = get_name(state0)
 
                         for state02 in connections0:  # connextions
-                            state02_name = get_name(state02)
+                            if state0[0] == state02[0]:
+                                state02_name = get_name(state02)
 
-                            if (state0, state02) not in drawn and state0 != state02: #DRAW EDGE
-                                g1.node(state02_name)
-                                g1.edge(state0_name, state02_name)
-                                drawn.add((state0, state02))
+                                if (state0, state02) not in drawn and state0 != state02: #DRAW EDGE
+                                    g1.node(state02_name)
+                                    g1.edge(state0_name, state02_name, label=get_trace(state0, state02))
+                                    drawn.add((state0, state02))
 
 
 
@@ -366,3 +335,29 @@ inflow_behavior = [('0','+'),
 
 graph_from_behavior(g1, inflow_behavior, valid_states)
 g1.view()
+
+g2 = Digraph('G', filename='increasing_inflow.gv')
+g2.attr('edge', overlap='false')
+
+inflow_behavior = [('0','+'),
+                   ('+', '+')]
+
+graph_from_behavior(g2, inflow_behavior, valid_states)
+g2.view()
+
+# g3 = Digraph('G', filename='sinusoidal_inflow.gv')
+# g3.attr('edge', overlap='false')
+#
+# inflow_behavior = [('0','+'),
+#                    ('+', '+'),
+#                    ('+', '0'),
+#                    ('+', '-'),
+#                    ('0', '0'),
+#                    ('0', '+'),
+#                    ('+', '+'),
+#                    ('+', '0'),
+#                    ('+', '-'),
+#                    ('0', '0')]
+#
+# graph_from_behavior(g3, inflow_behavior, valid_states)
+# g3.view()
