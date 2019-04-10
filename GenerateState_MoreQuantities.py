@@ -238,8 +238,8 @@ def generate_transitions(state, graph, all_states, model, next_val):
                 graph.edge(state1_name, state2_name) # draw edge
                 all_states[state].append(state2)     # save edge
         else:
-            print("couldnt find:", str(state2))
-
+            # print("couldnt find:", str(state2))
+            None
 def get_next_assignment(model):
     t = ()
     for key,val in model.items():
@@ -290,8 +290,8 @@ def generate_transitions_inflow(state, graph, all_states, drawn, model, next_val
                 all_states[state].append(state2)     # save edge
                 drawn.add((state,state2))
         else:
-            print("couldnt find:", str(state2))
-
+            # print("couldnt find:", str(state2))
+            None
 
 def get_trace(state1, state2):
     if state1[0] != state2[0]:
@@ -400,9 +400,9 @@ inflow_behavior = [('0','+'),
 graph_from_behavior(g1, inflow_behavior, valid_states)
 g1.view()
 
-g2 = Digraph('G', filename='decreasing_inflow_5.gv')
-g2.node_attr.update(color='cornflowerblue', style='filled')
-g2.attr('edge', overlap='false')
+# g2 = Digraph('G', filename='decreasing_inflow_5.gv')
+# g2.node_attr.update(color='cornflowerblue', style='filled')
+# g2.attr('edge', overlap='false')
 
 inflow_behavior = [('+','0'),
                    ('+', '-'),
@@ -410,3 +410,27 @@ inflow_behavior = [('+','0'),
 
 graph_from_behavior(g2, inflow_behavior, valid_states)
 g2.view()
+
+
+#Generating intra-state trace
+
+inter_state = {
+    ('0','+') : 'Current magnitude of quantity is 0 and is Increasing. ',
+    ('0', '0') :'Current magnitude of quantity is 0 and is not changing. ',
+    ('+', '0') : 'Current magnitude of quantity is positive and is not changing. ',
+    ('+','+') :'Current magnitude of quantity is positive and is increasing. ',
+    ('+', '-') : 'Current magnitude of quantity is positive and is  decreasing. ',
+    ('MAX', '0'): 'quantity is at its maximum capacity and is not changing. ',
+    ('MAX', '-'): 'quantity is at its maximum capacity and is decreasing. '
+}
+quantity = ['inflow', 'volume', 'outflow', 'height', 'pressure']
+for state in valid_states:
+    inter_state_descr = ""
+    for id, quan in enumerate(state):
+        descr = inter_state[quan]
+        descr = descr.replace("quantity", quantity[id])
+        inter_state_descr += descr
+    name = get_name(state)
+    name = name.replace('\n', '')
+    print(name,":", inter_state_descr)
+

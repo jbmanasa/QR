@@ -137,7 +137,7 @@ def get_name(state):
     return node_name
 
 def affecting_connections (q1, val1, model, state2s):
-    print('ac', get_next_assignment(model))
+    # print('ac', get_next_assignment(model))
     for (ival, q2) in val1['I']:
         influencer_mag = '+' if model[q1]['next'][0] == 'MAX' else model[q1]['next'][0]
         new_derivative = None
@@ -197,13 +197,14 @@ def generate_transitions(state, graph, all_states, model, next_val, only_exogeno
     for state2 in state2s: # connect edges
         if state2 in all_states:
             state2_name = get_name(state2)
-            print("found:", str(state2))
+            # print("found:", str(state2))
             if state2 not in all_states[state] and state2 != state:
                 graph.edge(state1_name, state2_name) # draw edge
                 all_states[state].append(state2)     # save edge
-                print("added:", str(state), str(state2))
+                # print("added:", str(state), str(state2))
         else:
-            print("couldnt find:", str(state2))
+            # print("couldnt find:", str(state2))
+            None
 
 def get_next_assignment(model):
     t = ()
@@ -215,13 +216,12 @@ def get_ambigious_state(state, derivative):
     t = (state[0],)
     for i in range(len(state)-1):
         t += ((state[i+1][0], derivative), )
-    print('fdmskfmsd', t)
+    # print('fdmskfmsd', t)
     return t
 
 def generate_transitions_inflow(state, graph, all_states, drawn, model, next_value, thesequantities=[]):
     state1_name = get_name(state)
     graph.node(state1_name)
-
     for i, key in enumerate(list(model.keys())):
         model[key]['now'] = state[i]
         model[key]['next'] = state[i]
@@ -234,12 +234,12 @@ def generate_transitions_inflow(state, graph, all_states, drawn, model, next_val
     model[q1]['next'] = next_value
     state2s.add(get_next_assignment(model))
 
-    print('not reverse')
+    # print('not reverse')
     for j, (q1, val1) in enumerate(model.items()):
         affecting_connections(q1, val1, model, state2s) # value corres. proportion, influence
 
     for j, (q1, val1) in enumerate(list(model.items())[::-1]):
-        print('reverse')
+        # print('reverse')
         affecting_connections(q1, val1, model, state2s)
 
     for state2 in list(state2s)[:]: # handle ambigious seperately in case not handled.
@@ -253,13 +253,14 @@ def generate_transitions_inflow(state, graph, all_states, drawn, model, next_val
             state2_name = get_name(state2)
 
             if (state,state2) not in drawn and state2 != state:
-                print("found", state2)
+                # print("found", state2)
                 graph.node(state2_name)
                 graph.edge(state1_name, state2_name, label=get_trace(state, state2, TRACE_TOGGLE)) # draw edge
                 all_states[state].append(state2)     # save edge
                 drawn.add((state,state2))
         else:
-            print("couldnt find:", str(state2))
+            # print("couldnt find:", str(state2))
+            None
 
 
 def get_trace(state1, state2, toggle):
@@ -309,9 +310,7 @@ def graph_from_behavior(g1, inflow_behavior, valid_states):
                 for state02 in connections0:  # connextions
                     if state0[0] == state02[0]:
                         state02_name = get_name(state02)
-
                         if (state0, state02) not in drawn and state0 != state02: #DRAW EDGE
-                            g1.node(state02_name)
                             g1.edge(state0_name, state02_name, label=get_trace(state0, state02, TRACE_TOGGLE))
                             drawn.add((state0, state02))
 
@@ -343,7 +342,7 @@ next_val = {('0', '+'): ('+', '+'),
 
 for state in valid_states.keys():
     generate_transitions(state, g, valid_states, model, next_val)
-g.view()
+# g.view()
 
 g1 = Digraph('G', filename='parabolic_inflow_3.gv')
 g1.attr(size='6,6')
@@ -356,7 +355,7 @@ inflow_behavior = [('0','+'),
                    ('0', '0')]
 
 graph_from_behavior(g1, inflow_behavior, valid_states)
-g1.view()
+# g1.view()
 
 g2 = Digraph('G', filename='decreasing_inflow_3.gv')
 g2.node_attr.update(color='cornflowerblue', style='filled')
@@ -366,7 +365,7 @@ inflow_behavior = [('+','0'),
                    ('+', '-'),
                    ('0', '0')]
 
-graph_from_behavior(g2, inflow_behavior, valid_states)
+num_state_dictionary = graph_from_behavior(g2, inflow_behavior, valid_states)
 g2.view()
 
 # g3 = Digraph('G', filename='sinusoidal_inflow.gv')
@@ -386,3 +385,24 @@ g2.view()
 # graph_from_behavior(g3, inflow_behavior, valid_states)
 # g3.view()
 
+#Generating intra-state trace
+
+inter_state = {
+    ('0','+') : 'Current magnitude of quantity is 0 and is Increasing. ',
+    ('0', '0') :'Current magnitude of quantity is 0 and is not changing. ',
+    ('+', '0') : 'Current magnitude of quantity is positive and is not changing. ',
+    ('+','+') :'Current magnitude of quantity is positive and is increasing. ',
+    ('+', '-') : 'Current magnitude of quantity is positive and is  decreasing. ',
+    ('MAX', '0'): 'quantity is at its maximum capacity and is not changing. ',
+    ('MAX', '-'): 'quantity is at its maximum capacity and is decreasing. '
+}
+quantity = ['inflow', 'volume', 'outflow']
+for state in valid_states:
+    inter_state_descr = ""
+    for id, quan in enumerate(state):
+        descr = inter_state[quan]
+        descr = descr.replace("quantity", quantity[id])
+        inter_state_descr += descr
+    name = get_name(state)
+    name = name.replace('\n', '')
+    print(name,":", inter_state_descr)
