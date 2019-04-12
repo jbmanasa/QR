@@ -293,7 +293,7 @@ def graph_from_behavior(g1, inflow_behavior, valid_states):
             state1_name = get_name(state0)
             g1.node(state1_name)
             if TRACE_TOGGLE:
-                g1.edge('start state', state1_name, label='initial state\n' + get_trace('start state', state, TRACE_TOGGLE))
+                g1.edge('start state', state1_name, label='initial state\n')
             else:
                 g1.edge('start state', state1_name)
             drawn.add(('start state', state0))
